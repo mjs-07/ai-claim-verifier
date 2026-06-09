@@ -1,0 +1,17 @@
+#ai-claim-verifier-overlay {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+
+    width: 250px;
+
+    background: white;
+    border: 2px solid black;
+
+    padding: 10px;
+
+    z-index: 999999; /* Without z-index, website elements may hide our overlay */
+    /* Larger Value puts the overlay on top */
+
+    font-family: Arial, sans-serif;
+}
