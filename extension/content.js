@@ -21,30 +21,42 @@ overlay.innerHTML = `
 
 document.body.appendChild(overlay);
 
-fetch("http://127.0.0.1:8000/health")
-  .then(response => response.json())
-  .then(data => {
+fetch("http://127.0.0.1:8000/analyze", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+        title: pageTitle,
+        text: pageText
+    })
+})
+.then(response => response.json())
+.then(data => {
+
     overlay.innerHTML = `
     <h3>AI Claim Verifier</h3>
 
     <p><strong>Title:</strong></p>
-    <p>${pageTitle}</p>
+    <p>${data.title}</p>
 
     <p><strong>Words:</strong></p>
-    <p>${wordCount}</p>
+    <p>${data.word_count}</p>
 
     <p><strong>Characters:</strong></p>
-    <p>${characterCount}</p>
+    <p>${data.character_count}</p>
 
     <hr>
 
-    <p><strong>Backend:</strong></p>
-    <p>${data.status}</p>
+    <p>${data.analysis}</p>
     `;
 })
-  .catch(error => {
-      overlay.innerHTML = `
-      <h3>AI Claim Verifier</h3>
-      <p>Backend Offline</p>
-      `;
-  });
+.catch(error => {
+
+    console.error(error);
+
+    overlay.innerHTML = `
+    <h3>AI Claim Verifier</h3>
+    <p>Analysis Failed</p>
+    `;
+});
