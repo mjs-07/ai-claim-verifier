@@ -21,13 +21,14 @@ overlay.innerHTML = `
 
 document.body.appendChild(overlay);
 
-fetch("http://127.0.0.1:8000/analyze", {
+fetch("http://127.0.0.1:8000/detect_text_ai", {
     method: "POST",
+
     headers: {
         "Content-Type": "application/json"
     },
+
     body: JSON.stringify({
-        title: pageTitle,
         text: pageText
     })
 })
@@ -38,17 +39,15 @@ fetch("http://127.0.0.1:8000/analyze", {
     <h3>AI Claim Verifier</h3>
 
     <p><strong>Title:</strong></p>
-    <p>${data.title}</p>
-
-    <p><strong>Words:</strong></p>
-    <p>${data.word_count}</p>
-
-    <p><strong>Characters:</strong></p>
-    <p>${data.character_count}</p>
+    <p>${pageTitle}</p>
 
     <hr>
 
-    <p>${data.analysis}</p>
+    <p><strong>AI Probability:</strong></p>
+    <p>${data.ai_probability}%</p>
+
+    <p><strong>Classification:</strong></p>
+    <p>${data.classification}</p>
     `;
 })
 .catch(error => {
@@ -57,6 +56,6 @@ fetch("http://127.0.0.1:8000/analyze", {
 
     overlay.innerHTML = `
     <h3>AI Claim Verifier</h3>
-    <p>Analysis Failed</p>
+    <p>Detection Failed</p>
     `;
 });

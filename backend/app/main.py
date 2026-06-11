@@ -1,9 +1,24 @@
 from fastapi import FastAPI # Import FastAPI framework
 from fastapi.middleware.cors import CORSMiddleware # Importing CORS middleware
 from pydantic import BaseModel
+from transformers import pipeline
+
+print("Loading AI detector...")
+
+ai_detector = pipeline(
+    "text-classification",
+    model="ogmatrixllm/glyph-v1.1"
+)
+
+print("AI detector loaded!")
+
+# We load the model before request, because loading model for every request will be painfully slow
 
 class PageData(BaseModel):
     title: str
+    text: str
+
+class TextDetectionRequest(BaseModel):
     text: str
 
 app = FastAPI() # Restaurant Created
@@ -26,7 +41,7 @@ def root():
 def health():
     return {"status": "Working"}
 
-@app.post("/analyze")# When someone visits '/health', run the below function
+@app.post("/analyze")# When someone visits '/analyze', run the below function
 # Third endpoint
 def analyze_page(data: PageData):
 
@@ -41,3 +56,22 @@ def analyze_page(data: PageData):
         "analysis": "Processed by FastAPI"
     }
 
+@app.post("/detect_text_ai")
+def detect_text_ai(data: TextDetectionRequest):
+
+    result = ai_detector(data.text)[0]
+
+    label = result["label"]
+    score = result["score"]
+
+    if label == "LABEL_1":
+        classification = "AI Generated"
+        ai_probability = score * 100
+    else:
+        classification = "Human Written"
+        ai_probability = (1 - score) * 100
+
+    return {
+        "classification": classification,
+        "ai_probability": round(ai_probability, 2)
+    }
