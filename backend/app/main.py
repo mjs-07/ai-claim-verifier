@@ -2,6 +2,7 @@ from fastapi import FastAPI # Import FastAPI framework
 from fastapi.middleware.cors import CORSMiddleware # Importing CORS middleware
 from pydantic import BaseModel
 from transformers import pipeline
+from backend.app.claim_filter import extract_claims
 
 print("Loading AI detector...")
 
@@ -19,6 +20,9 @@ class PageData(BaseModel):
     text: str
 
 class TextDetectionRequest(BaseModel):
+    text: str
+
+class ClaimExtractionRequest(BaseModel):
     text: str
 
 app = FastAPI() # Restaurant Created
@@ -74,4 +78,16 @@ def detect_text_ai(data: TextDetectionRequest):
     return {
         "classification": classification,
         "ai_probability": round(ai_probability, 2)
+    }
+
+@app.post("/extract_claims")
+def extract_claims_endpoint(
+    data: ClaimExtractionRequest
+):
+
+    claims = extract_claims(data.text)
+
+    return {
+        "claims": claims,
+        "claim_count": len(claims)
     }
