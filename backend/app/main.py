@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware # Importing CORS middleware
 from pydantic import BaseModel
 from transformers import pipeline
 from backend.app.claim_filter import extract_claims
+from backend.app.verifier import verify_claim
 
 print("Loading AI detector...")
 
@@ -24,6 +25,9 @@ class TextDetectionRequest(BaseModel):
 
 class ClaimExtractionRequest(BaseModel):
     text: str
+
+class VerifyClaimRequest(BaseModel):
+    claim: str
 
 app = FastAPI() # Restaurant Created
 
@@ -90,4 +94,17 @@ def extract_claims_endpoint(
     return {
         "claims": claims,
         "claim_count": len(claims)
+    }
+
+@app.post("/verify_claim")
+def verify_claim_endpoint(
+    data: VerifyClaimRequest
+):
+
+    result = verify_claim(data.claim)
+
+    return {
+        "claim": data.claim,
+        "status": result["status"],
+        "confidence": result["confidence"]
     }
