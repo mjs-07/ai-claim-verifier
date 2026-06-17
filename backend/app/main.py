@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from transformers import pipeline
 from backend.app.claim_filter import extract_claims
 from backend.app.verifier import verify_claim
+from backend.app.image_detection.detector import ImageDetector
+
 
 print("Loading AI detector...")
 
@@ -28,6 +30,9 @@ class ClaimExtractionRequest(BaseModel):
 
 class VerifyClaimRequest(BaseModel):
     claim: str
+
+class ImageRequest(BaseModel):
+    image_path: str
 
 app = FastAPI() # Restaurant Created
 
@@ -108,3 +113,14 @@ def verify_claim_endpoint(
         "status": result["status"],
         "confidence": result["confidence"]
     }
+
+image_detector = ImageDetector()
+
+@app.post("/detect_ai_image")
+def detect_ai_image(request: ImageRequest):
+
+    result = image_detector.predict(
+        request.image_path
+    )
+
+    return result
