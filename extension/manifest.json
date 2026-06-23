@@ -1,14 +1,24 @@
 {
-  "manifest_version": 3, 
+  "manifest_version": 3,
+
   "name": "AI Claim Verifier",
+
   "version": "1.0",
+
   "description": "Detect AI-generated content and verify claims",
 
-  "permissions": [],
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
 
   "host_permissions": [
     "http://127.0.0.1:8000/*"
   ],
+
+  "action": {
+    "default_popup": "popup.html"
+  },
 
   "content_scripts": [
     {
