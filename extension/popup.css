@@ -1,15 +1,133 @@
 body {
-    width: 350px;
+    width: 380px;
     padding: 15px;
     font-family: Arial, sans-serif;
+    background: #f8fafc;
+    color: #1e293b;
+}
+
+h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    text-align: center;
 }
 
 button {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: #2563eb;
+    color: white;
+
+    font-size: 14px;
+    font-weight: bold;
+
     cursor: pointer;
+}
+
+button:hover {
+    background: #1d4ed8;
 }
 
 #results {
     margin-top: 15px;
+
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.card {
+    background: white;
+
+    border-radius: 10px;
+
+    padding: 12px;
+
+    margin-bottom: 10px;
+
+    box-shadow:
+        0 2px 6px rgba(0,0,0,0.1);
+}
+
+.score {
+    font-size: 28px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.low-risk {
+    color: #16a34a;
+    font-weight: bold;
+}
+
+.medium-risk {
+    color: #ca8a04;
+    font-weight: bold;
+}
+
+.high-risk {
+    color: #dc2626;
+    font-weight: bold;
+}
+
+.claim {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.claim:last-child {
+    border-bottom: none;
+}
+.claim {
+    margin-top: 15px;
+    padding: 10px;
+    border-top: 1px solid #ddd;
+}
+
+.evidence-list {
+    margin-top: 10px;
+}
+
+.evidence-link {
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 12px;
+}
+
+.evidence-link:hover {
+    text-decoration: underline;
+}
+.evidence-btn {
+
+    margin-top: 10px;
+
+    padding: 8px;
+
+    width: 100%;
+
+    border: none;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+}
+
+.evidence-container {
+
+    margin-top: 10px;
+
+    padding-top: 10px;
+}
+.no-evidence {
+
+    color: #777;
+
+    font-style: italic;
+
+    margin-top: 10px;
+
 }

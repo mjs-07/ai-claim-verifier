@@ -128,7 +128,29 @@ document
                 );
 
             // ==========================
-            // STEP 5 - RENDER UI
+            // STEP 5 - RISK BADGE
+            // ==========================
+
+            let riskLevel = "Medium Risk";
+            let riskClass = "medium-risk";
+
+            if (
+                aiData.ai_probability < 30 &&
+                credibilityScore > 70
+            ) {
+                riskLevel = "Low Risk";
+                riskClass = "low-risk";
+            }
+            else if (
+                aiData.ai_probability > 70 &&
+                credibilityScore < 50
+            ) {
+                riskLevel = "High Risk";
+                riskClass = "high-risk";
+            }
+
+            // ==========================
+            // STEP 6 - RENDER UI
             // ==========================
 
             let claimsHtml = "";
@@ -140,32 +162,121 @@ document
 
             } else {
 
-                claimsHtml = "<ul>";
-
                 verificationResults.forEach(
-                    result => {
+                    (result, index) => {
+
+                        let evidenceHtml = "";
+
+                        if (
+                            result.evidence &&
+                            result.evidence.length > 0
+                        ) {
+
+                            evidenceHtml +=
+                                "<div class='evidence-list'>";
+
+                            result.evidence.forEach(
+                                evidence => {
+
+                                    evidenceHtml += `
+                                    <a
+                                        href="${evidence.url}"
+                                        target="_blank"
+                                        class="evidence-link"
+                                    >
+                                        🔗 ${evidence.title}
+                                    </a>
+                                    <br>
+                                    `;
+                                }
+                            );
+
+                            evidenceHtml += "</div>";
+                        }
+                        else {
+
+                        evidenceHtml = `
+                        <p class="no-evidence">
+                            No supporting evidence found.
+                        </p>
+                        `;
+                        }
+
+                        const evidenceId = "evidence-" + index;
+
+                        const buttonLabel =
+                            result.evidence &&
+                            result.evidence.length > 0
+                                ? "View Evidence"
+                                : "No Evidence Available";
 
                         claimsHtml += `
-                            <li>
-                                ${result.claim}
-                                <br>
-                                <strong>
-                                    ${result.status}
-                                </strong>
-                                (${result.confidence}%)
-                            </li>
+                        <div class="claim">
+
+                            <p>
+                                <strong>Claim:</strong>
+                            </p>
+
+                            <p>${result.claim}</p>
+
+                            <p>
+                                <strong>Status:</strong>
+                                ${result.status}
+                            </p>
+
+                            <p>
+                                <strong>Confidence:</strong>
+                                ${result.confidence}%
+                            </p>
+
+                            <button
+                                class="evidence-btn"
+                                data-target="${evidenceId}"
+                                data-default-label="${buttonLabel}"
+                            >
+                                ${buttonLabel}
+                            </button>
+
+                            <div
+                                id="${evidenceId}"
+                                class="evidence-container"
+                                style="display:none;"
+                            >
+
+                                ${evidenceHtml}
+
+                            </div>
+
+                        </div>
                         `;
                     }
                 );
-
-                claimsHtml += "</ul>";
             }
 
             document.getElementById(
                 "results"
             ).innerHTML = `
 
-                <hr>
+            <div class="card">
+
+                <div class="score">
+                    ${credibilityScore}/100
+                </div>
+
+                <p style="text-align:center;">
+                    Trust Score
+                </p>
+
+                <p
+                    class="${riskClass}"
+                    style="text-align:center;"
+                >
+                    ${riskLevel}
+                </p>
+
+            </div>
+
+            <div class="card">
 
                 <p>
                     <strong>AI Probability:</strong>
@@ -177,7 +288,9 @@ document
                     ${aiData.classification}
                 </p>
 
-                <hr>
+            </div>
+
+            <div class="card">
 
                 <p>
                     <strong>Claims Found:</strong>
@@ -186,13 +299,69 @@ document
 
                 ${claimsHtml}
 
-                <hr>
-
-                <p>
-                    <strong>Credibility Score:</strong>
-                    ${credibilityScore}/100
-                </p>
+            </div>
             `;
+
+            document.addEventListener("click", (event) => {
+
+                if (
+                    !event.target.classList.contains(
+                        "evidence-btn"
+                    )
+                ) {
+                    return;
+                }
+
+                const button = event.target;
+
+                console.log("Button clicked");
+
+                console.log(button.dataset.target);
+
+                const target =
+                    document.getElementById(
+                        button.dataset.target
+                    );
+
+                console.log("Target:");
+                console.log(target);
+
+                if (!target) {
+                    console.log("TARGET NOT FOUND");
+                    return;
+                }
+
+                console.log(
+                    "Current display:",
+                    target.style.display
+                );
+
+                if (
+                    target.style.display === "none" ||
+                    target.style.display === ""
+                ) {
+
+                    target.style.display = "block";
+
+                    button.innerText =
+                        "Hide Evidence";
+
+                    console.log(
+                        "Changed to BLOCK"
+                    );
+
+                } else {
+
+                    target.style.display = "none";
+
+                    button.innerText =
+                        button.dataset.defaultLabel;
+
+                    console.log(
+                        "Changed to NONE"
+                    );
+                }
+            });
 
         } catch (error) {
 
@@ -204,3 +373,4 @@ document
                 "<p>Analysis Failed</p>";
         }
     });
+

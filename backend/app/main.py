@@ -111,7 +111,8 @@ def verify_claim_endpoint(
     return {
         "claim": data.claim,
         "status": result["status"],
-        "confidence": result["confidence"]
+        "confidence": result["confidence"],
+        "evidence": result["evidence"]
     }
 
 image_detector = ImageDetector()

@@ -8,15 +8,13 @@ response = requests.get(
     }
 )
 
-print("Status Code:")
 print(response.status_code)
 
-print()
+data = response.json()
 
-print("Content Type:")
-print(response.headers.get("Content-Type"))
+print("Results:", len(data["results"]))
 
-print()
-
-print("Response:")
-print(response.text[:1000])
+for result in data["results"][:3]:
+    print(result["title"])
+    print(result["url"])
+    print()
