@@ -1,5 +1,9 @@
 import requests
 
+from backend.app.semantic_verifier import (
+    similarity_score
+)
+
 
 def verify_claim(claim: str):
 
@@ -13,47 +17,82 @@ def verify_claim(claim: str):
 
     data = response.json()
 
-    results = data.get("results", [])
+    results = data.get(
+        "results",
+        []
+    )
 
     evidence = []
 
-    for result in results[:5]:
-        evidence.append({
-            "title": result.get("title"),
-            "url": result.get("url")
-        })
-
-    relevant_results = 0
-
-    claim_words = set(
-        claim.lower().split()
-    )
+    best_similarity = 0
 
     for result in results[:5]:
 
         title = result.get(
-            "title", ""
-        ).lower()
-
-        overlap = claim_words.intersection(
-            set(title.split())
+            "title",
+            ""
         )
 
-        if len(overlap) >= 2:
-            relevant_results += 1
+        snippet = result.get(
+            "content",
+            ""
+        )
 
-    confidence = min(
-        relevant_results * 25,
-        95
+        url = result.get(
+            "url",
+            ""
+        )
+
+        combined_text = (
+            title + " " + snippet
+        )
+
+        similarity = similarity_score(
+            claim,
+            combined_text
+        )
+
+        evidence.append({
+            "title": title,
+            "url": url,
+            "snippet": snippet,
+            "similarity":
+                round(
+                    similarity * 100,
+                    1
+                )
+        })
+
+        if similarity > best_similarity:
+            best_similarity = similarity
+
+    evidence.sort(
+        key=lambda x:
+        x["similarity"],
+        reverse=True
     )
 
-    status = ( "Supported" if confidence >= 50 else "Unknown")
+    confidence = int(
+        best_similarity * 100
+    )
 
-    if confidence < 50:
+    if confidence >= 70:
+
+        status = "Supported"
+
+    elif confidence >= 50:
+
+        status = "Partially Supported"
+
+    else:
+
+        status = "Unknown"
+
         evidence = []
 
     return {
+        "claim": claim,
         "status": status,
         "confidence": confidence,
-        "evidence": evidence
+        "evidence": evidence[:5]
     }

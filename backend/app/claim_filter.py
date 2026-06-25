@@ -1,50 +1,90 @@
-import re
+import spacy
+
+nlp = spacy.load("en_core_web_sm")
 
 
 def extract_claims(text: str):
 
-    sentences = re.split(r'[.!?]+', text)
+    doc = nlp(text)
 
     claims = []
 
-    opinion_starters = [
-        "i think",
-        "i believe",
-        "in my opinion",
-        "personally"
-    ]
+    opinion_words = {
+        "think",
+        "believe",
+        "feel",
+        "opinion",
+        "guess",
+        "suppose",
+        "prefer",
+        "hope"
+    }
 
-    recommendation_words = [
+    recommendation_words = {
         "should",
         "must",
-        "ought to"
-    ]
+        "ought",
+        "recommend",
+        "suggest"
+    }
 
-    for sentence in sentences:
+    for sent in doc.sents:
 
-        sentence = sentence.strip()
+        sentence = sent.text.strip()
 
         if not sentence:
             continue
 
-        lower_sentence = sentence.lower()
+        sent_doc = nlp(sentence)
+
+        has_subject = False
+        has_verb = False
+        has_attribute = False
+
+        contains_opinion = False
+        contains_recommendation = False
+
+        for token in sent_doc:
+
+            if token.dep_ in (
+                "nsubj",
+                "nsubjpass"
+            ):
+                has_subject = True
+
+            if token.pos_ in (
+                "VERB",
+                "AUX"
+            ):
+                has_verb = True
+
+            if token.dep_ in (
+                "attr",
+                "acomp"
+            ):
+                has_attribute = True
+
+            if token.lemma_.lower() in opinion_words:
+                contains_opinion = True
+
+            if token.lemma_.lower() in recommendation_words:
+                contains_recommendation = True
 
         # Reject opinions
 
-        if any(
-            lower_sentence.startswith(opinion)
-            for opinion in opinion_starters
-        ):
+        if contains_opinion:
             continue
 
         # Reject recommendations
 
-        if any(
-            word in lower_sentence
-            for word in recommendation_words
-        ):
+        if contains_recommendation:
             continue
 
-        claims.append(sentence)
+        # Accept factual statements
+
+        if has_verb and (
+            has_subject or has_attribute
+        ) and is_factual_claim(sentence):
+            claims.append(sentence)
 
     return claims

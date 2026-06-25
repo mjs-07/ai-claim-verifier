@@ -5,6 +5,7 @@ from transformers import pipeline
 from backend.app.claim_filter import extract_claims
 from backend.app.verifier import verify_claim
 from backend.app.image_detection.detector import ImageDetector
+from backend.app.claim_normalizer import normalize_claims
 
 
 print("Loading AI detector...")
@@ -95,10 +96,11 @@ def extract_claims_endpoint(
 ):
 
     claims = extract_claims(data.text)
+    normalized_claims = normalize_claims(claims)
 
     return {
-        "claims": claims,
-        "claim_count": len(claims)
+        "claims": normalized_claims,
+        "claim_count": len(normalized_claims)
     }
 
 @app.post("/verify_claim")
