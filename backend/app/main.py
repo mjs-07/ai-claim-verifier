@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from transformers import pipeline
 from backend.app.claim_filter import extract_claims
 from backend.app.verifier import verify_claim
-from backend.app.image_detection.detector import ImageDetector
+# from backend.app.image_detection.detector import ImageDetector
 from backend.app.claim_normalizer import normalize_claims
 
 
@@ -117,13 +117,13 @@ def verify_claim_endpoint(
         "evidence": result["evidence"]
     }
 
-image_detector = ImageDetector()
+# image_detector = ImageDetector()
 
-@app.post("/detect_ai_image")
-def detect_ai_image(request: ImageRequest):
+# @app.post("/detect_ai_image")
+# def detect_ai_image(request: ImageRequest):
 
-    result = image_detector.predict(
-        request.image_path
-    )
+#     result = image_detector.predict(
+#         request.image_path
+#     )
 
-    return result
+#     return result

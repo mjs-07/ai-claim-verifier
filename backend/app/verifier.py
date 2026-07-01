@@ -4,16 +4,41 @@ from backend.app.semantic_verifier import (
     similarity_score
 )
 
+from backend.app.nli_verifier import (
+    verify_with_nli
+)
+
+from backend.app.source_ranker import (
+    get_source_metadata
+)
+
+from backend.app.consensus_engine import (
+    consensus_decision
+)
+from backend.app.credibility_engine import (
+    calculate_credibility
+)
+
+
+SEARXNG_URL = "http://localhost:8080/search"
+
 
 def verify_claim(claim: str):
 
+    # -----------------------------
+    # Step 1 : Retrieve Search Results
+    # -----------------------------
+
     response = requests.get(
-        "http://localhost:8080/search",
+        SEARXNG_URL,
         params={
             "q": claim,
             "format": "json"
-        }
+        },
+        timeout=10
     )
+
+    response.raise_for_status()
 
     data = response.json()
 
@@ -22,11 +47,13 @@ def verify_claim(claim: str):
         []
     )
 
-    evidence = []
+    # -----------------------------
+    # Step 2 : Semantic Ranking
+    # -----------------------------
 
-    best_similarity = 0
+    candidate_evidence = []
 
-    for result in results[:5]:
+    for result in results[:10]:
 
         title = result.get(
             "title",
@@ -43,56 +70,165 @@ def verify_claim(claim: str):
             ""
         )
 
-        combined_text = (
-            title + " " + snippet
+        combined = (
+            title +
+            ". " +
+            snippet
         )
 
         similarity = similarity_score(
             claim,
-            combined_text
+            combined
+        )
+
+        candidate_evidence.append({
+
+            "title": title,
+
+            "url": url,
+
+            "snippet": snippet,
+
+            "combined": combined,
+
+            "similarity": round(
+                similarity * 100,
+                2
+            )
+
+        })
+
+    # -----------------------------
+    # Step 3 : Keep Best Semantic Matches
+    # -----------------------------
+
+    candidate_evidence.sort(
+
+        key=lambda x:
+        x["similarity"],
+
+        reverse=True
+
+    )
+
+    top_candidates = candidate_evidence[:5]
+
+    # -----------------------------
+    # Step 4 : Source Ranking + NLI
+    # -----------------------------
+
+    evidence = []
+
+    for item in top_candidates:
+
+        metadata = get_source_metadata(
+            item["url"]
+        )
+
+        nli = verify_with_nli(
+            claim,
+            item["combined"]
         )
 
         evidence.append({
-            "title": title,
-            "url": url,
-            "snippet": snippet,
-            "similarity":
+
+            **item,
+
+            "domain":
+                metadata["domain"],
+
+            "category":
+                metadata["category"],
+
+            "tier":
+                metadata["tier"],
+
+            "source_trust":
+                metadata["trust"],
+
+            "nli_status":
+                nli["status"],
+
+            "nli_confidence":
                 round(
-                    similarity * 100,
-                    1
+                    nli["confidence"],
+                    2
                 )
+
         })
 
-        if similarity > best_similarity:
-            best_similarity = similarity
+    # -----------------------------
+    # Step 5 : Consensus Decision
+    # -----------------------------
+
+    decision = consensus_decision(
+        evidence
+    )
+
+    credibility = calculate_credibility(
+        decision,
+        evidence
+    )
+
+    # -----------------------------
+    # Step 6 : Final Evidence Ranking
+    # -----------------------------
 
     evidence.sort(
-        key=lambda x:
-        x["similarity"],
+
+        key=lambda x: (
+
+            x["weighted_score"],
+
+            x["similarity"]
+
+        ),
+
         reverse=True
+
     )
 
-    confidence = int(
-        best_similarity * 100
-    )
-
-    if confidence >= 70:
-
-        status = "Supported"
-
-    elif confidence >= 50:
-
-        status = "Partially Supported"
-
-    else:
-
-        status = "Unknown"
-
-        evidence = []
+    # -----------------------------
+    # Step 7 : API Response
+    # -----------------------------
 
     return {
+
         "claim": claim,
-        "status": status,
-        "confidence": confidence,
-        "evidence": evidence[:5]
+
+        "status":
+            decision["status"],
+
+        "confidence":
+            decision["confidence"],
+
+        "agreement_ratio":
+            decision["agreement_ratio"],
+
+        "consensus_strength":
+            decision["consensus_strength"],
+
+        "positive_score":
+            decision["positive_score"],
+
+        "negative_score":
+            decision["negative_score"],
+
+        "supported_sources":
+            decision["supported_sources"],
+
+        "contradicted_sources":
+            decision["contradicted_sources"],
+
+        "neutral_sources":
+            decision["neutral_sources"],
+
+        "credibility":
+
+            credibility,
+
+        "evidence":
+
+            evidence[:3]
+
     }

@@ -3,30 +3,117 @@ import spacy
 nlp = spacy.load("en_core_web_sm")
 
 
+OPINION_WORDS = {
+    "think",
+    "believe",
+    "feel",
+    "opinion",
+    "guess",
+    "suppose",
+    "prefer",
+    "hope"
+}
+
+RECOMMENDATION_WORDS = {
+    "should",
+    "must",
+    "ought",
+    "recommend",
+    "suggest"
+}
+
+
+def is_verifiable_claim(sentence: str) -> bool:
+    """
+    Determines whether a sentence is a factual,
+    verifiable claim.
+
+    Returns:
+        True  -> Fact-checkable
+        False -> Opinion / Recommendation /
+                 Fragment / Conversation
+    """
+
+    doc = nlp(sentence)
+
+    has_subject = False
+    has_verb = False
+    has_attribute = False
+
+    contains_opinion = False
+    contains_recommendation = False
+
+    entity_count = len(doc.ents)
+
+    for token in doc:
+
+        if token.dep_ in (
+            "nsubj",
+            "nsubjpass"
+        ):
+            has_subject = True
+
+        if token.pos_ in (
+            "VERB",
+            "AUX"
+        ):
+            has_verb = True
+
+        if token.dep_ in (
+            "attr",
+            "acomp"
+        ):
+            has_attribute = True
+
+        lemma = token.lemma_.lower()
+
+        if lemma in OPINION_WORDS:
+            contains_opinion = True
+
+        if lemma in RECOMMENDATION_WORDS:
+            contains_recommendation = True
+
+    # -------------------------
+    # Reject obvious non-claims
+    # -------------------------
+
+    if contains_opinion:
+        return False
+
+    if contains_recommendation:
+        return False
+
+    if len(sentence.split()) < 4:
+        return False
+
+    if not has_verb:
+        return False
+
+    if not (has_subject or has_attribute):
+        return False
+
+    # -------------------------
+    # Positive indicators
+    # -------------------------
+
+    if entity_count > 0:
+        return True
+
+    if has_subject and has_verb:
+        return True
+
+    return False
+
+
 def extract_claims(text: str):
+    """
+    Extract only factual,
+    verifiable claims.
+    """
 
     doc = nlp(text)
 
     claims = []
-
-    opinion_words = {
-        "think",
-        "believe",
-        "feel",
-        "opinion",
-        "guess",
-        "suppose",
-        "prefer",
-        "hope"
-    }
-
-    recommendation_words = {
-        "should",
-        "must",
-        "ought",
-        "recommend",
-        "suggest"
-    }
 
     for sent in doc.sents:
 
@@ -35,56 +122,7 @@ def extract_claims(text: str):
         if not sentence:
             continue
 
-        sent_doc = nlp(sentence)
-
-        has_subject = False
-        has_verb = False
-        has_attribute = False
-
-        contains_opinion = False
-        contains_recommendation = False
-
-        for token in sent_doc:
-
-            if token.dep_ in (
-                "nsubj",
-                "nsubjpass"
-            ):
-                has_subject = True
-
-            if token.pos_ in (
-                "VERB",
-                "AUX"
-            ):
-                has_verb = True
-
-            if token.dep_ in (
-                "attr",
-                "acomp"
-            ):
-                has_attribute = True
-
-            if token.lemma_.lower() in opinion_words:
-                contains_opinion = True
-
-            if token.lemma_.lower() in recommendation_words:
-                contains_recommendation = True
-
-        # Reject opinions
-
-        if contains_opinion:
-            continue
-
-        # Reject recommendations
-
-        if contains_recommendation:
-            continue
-
-        # Accept factual statements
-
-        if has_verb and (
-            has_subject or has_attribute
-        ) and is_factual_claim(sentence):
+        if is_verifiable_claim(sentence):
             claims.append(sentence)
 
     return claims
