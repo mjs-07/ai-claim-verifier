@@ -6,16 +6,19 @@ from backend.app.claim_filter import extract_claims
 from backend.app.verifier import verify_claim
 # from backend.app.image_detection.detector import ImageDetector
 from backend.app.claim_normalizer import normalize_claims
+import logging
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-print("Loading AI detector...")
+logger.info("Loading AI detector...")
 
 ai_detector = pipeline(
     "text-classification",
     model="ogmatrixllm/glyph-v1.1"
 )
 
-print("AI detector loaded!")
+logger.info("AI detector loaded successfully.")
 
 # We load the model before request, because loading model for every request will be painfully slow
 
@@ -38,7 +41,15 @@ class ImageRequest(BaseModel):
 class AnalyzeRequest(BaseModel):
     text: str
 
-app = FastAPI() # Restaurant Created
+app = FastAPI(
+    title="AI Claim Verifier API",
+    description=(
+        "Backend API for AI-generated text detection, "
+        "claim extraction, semantic verification, "
+        "and credibility scoring."
+    ),
+    version="1.0.0"
+) # Restaurant Created
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,15 +59,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/") # When someone visits '/', run the below function. 
+@app.get("/", tags=["System"]) # When someone visits '/', run the below function. 
 # This is the first endpoint
 def root():
     return {"message": "AI claim verifier backend is running!"}
 
-@app.get("/health") # When someone visits '/health', run the below function
+@app.get("/health", tags=["System"]) # When someone visits '/health', run the below function
 # This is the second endpoint
 def health():
-    return {"status": "Working"}
+    return {
+        "status": "ok",
+        "service": "AI Claim Verifier Backend",
+        "version": "1.0.0"
+    }
 
 @app.post("/page_analysis")# When someone visits '/page_analysis', run the below function
 # Third endpoint
@@ -73,27 +88,35 @@ def analyze_page(data: PageData):
         "analysis": "Processed by FastAPI"
     }
 
-@app.post("/detect_text_ai")
+@app.post("/detect_text_ai", tags=["AI Detection"])
 def run_ai_detection(data: TextDetectionRequest):
+    try:
+        result = ai_detector(data.text)[0]
 
-    result = ai_detector(data.text)[0]
+        label = result["label"]
+        score = result["score"]
 
-    label = result["label"]
-    score = result["score"]
+        if label == "LABEL_1":
+            classification = "AI Generated"
+            ai_probability = score * 100
+        else:
+            classification = "Human Written"
+            ai_probability = (1 - score) * 100
 
-    if label == "LABEL_1":
-        classification = "AI Generated"
-        ai_probability = score * 100
-    else:
-        classification = "Human Written"
-        ai_probability = (1 - score) * 100
+        return {
+            "classification": classification,
+            "ai_probability": round(ai_probability, 2)
+        }
 
-    return {
-        "classification": classification,
-        "ai_probability": round(ai_probability, 2)
-    }
+    except Exception as e:
+        logger.exception("AI detection failed.")
 
-@app.post("/extract_claims")
+        return {
+            "error": "AI detection failed.",
+            "details": str(e)
+        }
+
+@app.post("/extract_claims", tags=["Claim Extraction"])
 def extract_claims_endpoint(
     data: ClaimExtractionRequest
 ):
@@ -111,20 +134,20 @@ def extract_claims_endpoint(
         selected_text = data.text.strip()
         if selected_text:
             normalized_claims = [selected_text]
-            
+
     return {
         "claims": normalized_claims,
         "claim_count": len(normalized_claims)
     }
 
-@app.post("/verify_claim")
+@app.post("/verify_claim", tags=["Fact Verification"])
 def verify_claim_endpoint(
     data: VerifyClaimRequest
 ):
 
     return verify_claim(data.claim)
 
-@app.post("/analyze")
+@app.post("/analyze", tags=["Analysis"])
 def analyze_text(data: AnalyzeRequest):
 
     # -----------------------------
