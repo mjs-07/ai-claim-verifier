@@ -53,14 +53,16 @@ def calculate_credibility(
 
         ) / len(evidence)
 
-    consensus_confidence = decision["confidence"]
+    consensus_confidence = decision.get(
+        "confidence",
+        0
+    )
 
     consensus_strength = (
-
-        decision["consensus_strength"]
-
-        * 100
-
+        decision.get(
+            "consensus_strength",
+            0
+        ) * 100
     )
 
     credibility = (

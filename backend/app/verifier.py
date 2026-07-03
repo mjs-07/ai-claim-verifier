@@ -1,4 +1,5 @@
 import requests
+import re
 
 from backend.app.semantic_verifier import (
     similarity_score
@@ -15,27 +16,84 @@ from backend.app.source_ranker import (
 from backend.app.consensus_engine import (
     consensus_decision
 )
+
 from backend.app.credibility_engine import (
     calculate_credibility
+)
+
+from backend.app.claim_normalizer import (
+    normalize_claims
 )
 
 
 SEARXNG_URL = "http://localhost:8080/search"
 
+def best_matching_text(claim: str, text: str):
+
+    """
+    Returns the sentence from the evidence that is
+    most semantically similar to the claim.
+    """
+
+    if not text.strip():
+        return text
+
+    sentences = re.split(
+        r'(?<=[.!?])\s+',
+        text
+    )
+
+    best_sentence = text
+    best_similarity = -1
+
+    for sentence in sentences:
+
+        sentence = sentence.strip()
+
+        if not sentence:
+            continue
+
+        similarity = similarity_score(
+            claim,
+            sentence
+        )
+
+        if similarity > best_similarity:
+
+            best_similarity = similarity
+            best_sentence = sentence
+
+    return best_sentence
+
 
 def verify_claim(claim: str):
 
-    # -----------------------------
-    # Step 1 : Retrieve Search Results
-    # -----------------------------
+    # ---------------------------------
+    # Step 1 : Normalize Search Query
+    # ---------------------------------
+
+    normalized = normalize_claims([claim])
+
+    if normalized:
+        search_query = normalized[0]
+    else:
+        search_query = claim
+
+    # ---------------------------------
+    # Step 2 : Retrieve Search Results
+    # ---------------------------------
 
     response = requests.get(
+
         SEARXNG_URL,
+
         params={
-            "q": claim,
+            "q": search_query,
             "format": "json"
         },
+
         timeout=10
+
     )
 
     response.raise_for_status()
@@ -47,13 +105,19 @@ def verify_claim(claim: str):
         []
     )
 
-    # -----------------------------
-    # Step 2 : Semantic Ranking
-    # -----------------------------
+    # Retrieve more candidates
+    results = results[:20]
+
+    # ---------------------------------
+    # Step 3 : Semantic Ranking +
+    #          Source Trust Ranking
+    # ---------------------------------
 
     candidate_evidence = []
 
-    for result in results[:10]:
+    seen_urls = set()
+
+    for result in results:
 
         title = result.get(
             "title",
@@ -70,15 +134,45 @@ def verify_claim(claim: str):
             ""
         )
 
+        if not url:
+            continue
+
+        # Remove duplicate URLs
+        normalized_url = url.split("?")[0]
+
+        if normalized_url in seen_urls:
+            continue
+
+        seen_urls.add(normalized_url)
+
         combined = (
             title +
             ". " +
             snippet
         )
 
-        similarity = similarity_score(
+        best_sentence = best_matching_text(
             claim,
             combined
+        )
+
+        similarity = similarity_score(
+            claim,
+            best_sentence
+        )
+
+        metadata = get_source_metadata(
+            url
+        )
+
+        source_trust = metadata["trust"]
+
+        ranking_score = (
+
+            0.75 * similarity +
+
+            0.25 * (source_trust / 100)
+
         )
 
         candidate_evidence.append({
@@ -91,21 +185,32 @@ def verify_claim(claim: str):
 
             "combined": combined,
 
+            "matched_sentence": best_sentence, 
+
             "similarity": round(
                 similarity * 100,
                 2
-            )
+            ),
+
+            "ranking_score": ranking_score,
+
+            "domain": metadata["domain"],
+
+            "category": metadata["category"],
+
+            "tier": metadata["tier"],
+
+            "source_trust": source_trust
 
         })
 
-    # -----------------------------
-    # Step 3 : Keep Best Semantic Matches
-    # -----------------------------
+    # ---------------------------------
+    # Step 4 : Keep Best Ranked Results
+    # ---------------------------------
 
     candidate_evidence.sort(
 
-        key=lambda x:
-        x["similarity"],
+        key=lambda x: x["ranking_score"],
 
         reverse=True
 
@@ -113,38 +218,22 @@ def verify_claim(claim: str):
 
     top_candidates = candidate_evidence[:5]
 
-    # -----------------------------
-    # Step 4 : Source Ranking + NLI
-    # -----------------------------
+    # ---------------------------------
+    # Step 5 : NLI Verification
+    # ---------------------------------
 
     evidence = []
 
     for item in top_candidates:
 
-        metadata = get_source_metadata(
-            item["url"]
-        )
-
         nli = verify_with_nli(
             claim,
-            item["combined"]
+            item["matched_sentence"]
         )
 
         evidence.append({
 
             **item,
-
-            "domain":
-                metadata["domain"],
-
-            "category":
-                metadata["category"],
-
-            "tier":
-                metadata["tier"],
-
-            "source_trust":
-                metadata["trust"],
 
             "nli_status":
                 nli["status"],
@@ -157,22 +246,25 @@ def verify_claim(claim: str):
 
         })
 
-    # -----------------------------
-    # Step 5 : Consensus Decision
-    # -----------------------------
+    # ---------------------------------
+    # Step 6 : Consensus
+    # ---------------------------------
 
     decision = consensus_decision(
         evidence
     )
 
     credibility = calculate_credibility(
+
         decision,
+
         evidence
+
     )
 
-    # -----------------------------
-    # Step 6 : Final Evidence Ranking
-    # -----------------------------
+    # ---------------------------------
+    # Step 7 : Final Evidence Ranking
+    # ---------------------------------
 
     evidence.sort(
 
@@ -180,7 +272,7 @@ def verify_claim(claim: str):
 
             x["weighted_score"],
 
-            x["similarity"]
+            x["ranking_score"]
 
         ),
 
@@ -188,9 +280,17 @@ def verify_claim(claim: str):
 
     )
 
-    # -----------------------------
-    # Step 7 : API Response
-    # -----------------------------
+    # Remove internal ranking score
+    for item in evidence:
+
+        item.pop(
+            "ranking_score",
+            None
+        )
+
+    # ---------------------------------
+    # Step 8 : API Response
+    # ---------------------------------
 
     return {
 
@@ -200,7 +300,10 @@ def verify_claim(claim: str):
             decision["status"],
 
         "confidence":
-            decision["confidence"],
+            min(
+                decision["confidence"],
+                99
+            ),
 
         "agreement_ratio":
             decision["agreement_ratio"],
@@ -224,11 +327,9 @@ def verify_claim(claim: str):
             decision["neutral_sources"],
 
         "credibility":
-
             credibility,
 
         "evidence":
-
             evidence[:3]
 
     }

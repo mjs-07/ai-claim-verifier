@@ -35,6 +35,9 @@ class VerifyClaimRequest(BaseModel):
 class ImageRequest(BaseModel):
     image_path: str
 
+class AnalyzeRequest(BaseModel):
+    text: str
+
 app = FastAPI() # Restaurant Created
 
 app.add_middleware(
@@ -55,7 +58,7 @@ def root():
 def health():
     return {"status": "Working"}
 
-@app.post("/analyze")# When someone visits '/analyze', run the below function
+@app.post("/page_analysis")# When someone visits '/page_analysis', run the below function
 # Third endpoint
 def analyze_page(data: PageData):
 
@@ -71,7 +74,7 @@ def analyze_page(data: PageData):
     }
 
 @app.post("/detect_text_ai")
-def detect_text_ai(data: TextDetectionRequest):
+def run_ai_detection(data: TextDetectionRequest):
 
     result = ai_detector(data.text)[0]
 
@@ -98,6 +101,17 @@ def extract_claims_endpoint(
     claims = extract_claims(data.text)
     normalized_claims = normalize_claims(claims)
 
+    # ----------------------------------
+    # Fallback:
+    # If no factual claims are extracted,
+    # verify the selected text itself.
+    # ----------------------------------
+
+    if len(normalized_claims) == 0:
+        selected_text = data.text.strip()
+        if selected_text:
+            normalized_claims = [selected_text]
+            
     return {
         "claims": normalized_claims,
         "claim_count": len(normalized_claims)
@@ -108,13 +122,123 @@ def verify_claim_endpoint(
     data: VerifyClaimRequest
 ):
 
-    result = verify_claim(data.claim)
+    return verify_claim(data.claim)
+
+@app.post("/analyze")
+def analyze_text(data: AnalyzeRequest):
+
+    # -----------------------------
+    # AI Detection
+    # -----------------------------
+
+    ai_result = run_ai_detection(
+        TextDetectionRequest(
+            text=data.text
+        )
+    )
+
+    # -----------------------------
+    # Claim Extraction
+    # -----------------------------
+
+    claims_result = extract_claims_endpoint(
+        ClaimExtractionRequest(
+            text=data.text
+        )
+    )
+
+    verification_results = []
+
+    # -----------------------------
+    # Verify Every Claim
+    # -----------------------------
+
+    for claim in claims_result["claims"]:
+
+        result = verify_claim(claim)
+
+        verification_results.append(result)
+
+    # -----------------------------
+    # Overall Statistics
+    # -----------------------------
+
+    supported = sum(
+        1
+        for r in verification_results
+        if r["status"] == "Supported"
+    )
+
+    contradicted = sum(
+        1
+        for r in verification_results
+        if r["status"] == "Contradicted"
+    )
+
+    unknown = sum(
+        1
+        for r in verification_results
+        if r["status"] not in (
+            "Supported",
+            "Contradicted"
+        )
+    )
+
+    # -----------------------------
+    # Overall Credibility
+    # -----------------------------
+
+    overall_credibility = None
+
+    if verification_results:
+
+        overall_credibility = round(
+
+            sum(
+                r["credibility"]["credibility_score"]
+                for r in verification_results
+            )
+
+            /
+
+            len(verification_results),
+
+            2
+
+        )
+
+    # -----------------------------
+    # Response
+    # -----------------------------
 
     return {
-        "claim": data.claim,
-        "status": result["status"],
-        "confidence": result["confidence"],
-        "evidence": result["evidence"]
+
+        "ai_detection": ai_result,
+
+        "claims_found":
+
+            len(claims_result["claims"]),
+
+        "supported_claims":
+
+            supported,
+
+        "contradicted_claims":
+
+            contradicted,
+
+        "unknown_claims":
+
+            unknown,
+
+        "overall_credibility":
+
+            overall_credibility,
+
+        "verification_results":
+
+            verification_results
+
     }
 
 # image_detector = ImageDetector()

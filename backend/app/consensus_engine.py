@@ -52,11 +52,19 @@ def consensus_decision(evidence_list):
 
             "confidence": 0,
 
+            "agreement_ratio": 0,
+
+            "positive_score": 0,
+
+            "negative_score": 0,
+
             "supported_sources": supported,
 
             "contradicted_sources": contradicted,
 
-            "neutral_sources": neutral
+            "neutral_sources": neutral,
+
+            "consensus_strength": 0
 
         }
 
