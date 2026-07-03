@@ -24,9 +24,16 @@ from backend.app.credibility_engine import (
 from backend.app.claim_normalizer import (
     normalize_claims
 )
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
-SEARXNG_URL = "http://localhost:8080/search"
+SEARXNG_URL = os.getenv(
+    "SEARXNG_URL",
+    "http://localhost:8080/search"
+)
 
 def best_matching_text(claim: str, text: str):
 
