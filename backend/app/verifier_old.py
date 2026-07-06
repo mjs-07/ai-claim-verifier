@@ -1,8 +1,6 @@
 import requests
 import re
 
-from bs4 import BeautifulSoup
-
 from backend.app.semantic_verifier import (
     similarity_score
 )
@@ -27,14 +25,15 @@ from backend.app.claim_normalizer import (
     normalize_claims
 )
 import os
-from backend.app.search_engine import search_web
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
-# SEARXNG_URL = os.getenv(
-#     "SEARXNG_URL",
-#     "http://localhost:8080/search"
-# )
-SEARXNG_URL = "https://search.mdosch.de/search"
+SEARXNG_URL = os.getenv(
+    "SEARXNG_URL",
+    "http://localhost:8080/search"
+)
 
 def best_matching_text(claim: str, text: str):
 
@@ -91,46 +90,30 @@ def verify_claim(claim: str):
     # Step 2 : Retrieve Search Results
     # ---------------------------------
 
-    # response = requests.get(
+    response = requests.get(
 
-    #     SEARXNG_URL,
+        SEARXNG_URL,
 
-    #     params={
-    #         "q": search_query,
-    #         "format": "json"
-    #     },
+        params={
+            "q": search_query,
+            "format": "json"
+        },
 
-    #     timeout=10
-
-    # )
-
-    # response.raise_for_status()
-
-    # data = response.json()
-
-    # results = data.get(
-    #     "results",
-    #     []
-    # )
-    search_results = search_web(
-        search_query,
-        count=5
+        timeout=10
 
     )
 
-    results = []
+    response.raise_for_status()
 
-    for item in search_results:
+    data = response.json()
 
-        results.append({
+    results = data.get(
+        "results",
+        []
+    )
 
-            "title": item["title"],
-
-            "url": item["url"],
-
-            "content": item["snippet"]
-
-        })
+    # Retrieve more candidates
+    results = results[:20]
 
     # ---------------------------------
     # Step 3 : Semantic Ranking +
@@ -198,25 +181,6 @@ def verify_claim(claim: str):
             0.25 * (source_trust / 100)
 
         )
-
-        domain = metadata["domain"]
-
-        bonus = 0
-
-        if any(x in domain for x in [
-            ".gov",
-            ".edu",
-            "who.int",
-            "cdc.gov",
-            "nih.gov",
-            "nasa.gov"
-        ]):
-            bonus = 0.05
-
-        elif "wikipedia.org" in domain:
-            bonus = 0.03
-
-        ranking_score += bonus
 
         candidate_evidence.append({
 
